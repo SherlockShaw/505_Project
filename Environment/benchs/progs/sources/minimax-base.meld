@@ -1,0 +1,46 @@
+
+type linear play(node, array int Game, int NextPlayer, int LastPlay, int Depth).
+type linear root(node).
+type linear build-next-plays(node, array int, int, int, int, int, int, int).
+type linear back(node, node).
+type linear score(node, int, int).
+type linear new-score(node, int, int).
+type linear maximize(node, int, int, int).
+type linear minimize(node, int, int, int).
+
+allocator "basic".
+const maxinf = 9999.
+const mininf = -9999.
+const root-player = 1.
+
+root(@0).
+
+play(A, Game, NextPlayer, LastPlay, Depth),
+Score = minimax_score2(Game, NextPlayer, root-player)
+   -o (if Score <> 0 then score(A, Score, LastPlay)
+         otherwise build-next-plays(A, Game, NextPlayer, 0, array_size(Game), 0, LastPlay, Depth) end).
+
+score(A, Score, BestPlay),
+back(A, B)
+   -o new-score(B, Score, BestPlay).
+
+new-score(A, Score, Play),
+minimize(A, N, Current, BestPlay),
+Current > Score // new best
+   -o minimize(A, N - 1, Score, Play).
+new-score(A, Score, Play),
+minimize(A, N, Current, BestPlay),
+Current <= Score
+   -o minimize(A, N - 1, Current, BestPlay).
+new-score(A, Score, Play),
+maximize(A, N, Current, BestPlay),
+Current < Score // best
+   -o maximize(A, N - 1, Score, Play).
+new-score(A, Score, Play),
+maximize(A, N, Current, BestPlay),
+Current >= Score
+   -o maximize(A, N - 1, Current, BestPlay).
+
+minimize(A, 0, Score, BestPlay) -o score(A, Score, BestPlay).
+maximize(A, 0, Score, BestPlay) -o score(A, Score, BestPlay).
+

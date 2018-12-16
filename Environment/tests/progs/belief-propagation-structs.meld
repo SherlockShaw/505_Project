@@ -1,0 +1,2 @@
+include #../../benchs/progs/sources/belief-propagation.meld
+include #data/bp-data20-structs.meld

@@ -1,0 +1,5 @@
+
+include #../../benchs/progs/sources/shortest-path-all.meld
+include #data/shortest-freemans.meld
+
+

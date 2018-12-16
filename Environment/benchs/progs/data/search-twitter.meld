@@ -1,0 +1,2 @@
+priority @cluster @static.
+data stanford-snap-search "twitter.txt" ["100" "1"].

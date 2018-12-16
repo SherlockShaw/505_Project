@@ -1,0 +1,143 @@
+
+type :(float, float, float, float, float) bvector.
+
+type route edge(node, node).
+type potential(node, bvector).
+
+type linear belief(node, bvector).
+type linear new-neighbor-belief(node, node, bvector). // neighbor sent an update
+type linear sent-neighbor-belief(node, node, bvector). // what we sent previously
+type linear neighbor-belief(node, node, bvector). // current neighbor belief
+type linear neighbor-belief-old(node, node, bvector).
+
+type linear start(node).
+type linear update(node).
+type linear update-messages(node, bvector).
+
+type list node tree.
+
+type linear start-tree(thread, tree).
+type linear new-tree(thread, tree, tree).
+type linear expand-tree(thread, tree, tree).
+type linear first-phase(thread, tree, tree).
+type linear second-phase(thread, tree).
+
+compact edge.
+compact potential.
+priority @initial 100.
+priority @static.
+priority @cluster @static.
+
+const global-potential =  :(-0.0, -2.0, -4.0, -6.0, -8.0, -2.0, -0.0, -2.0, -4.0,
+                            -6.0, -4.0, -2.0, -0.0, -2.0, -4.0, -6.0, -4.0, -2.0,
+                            -0.0, -2.0, -8.0, -6.0, -4.0, -2.0, -0.0).
+const initial-message = :(-1.60944, -1.60944, -1.60944, -1.60944, -1.60944).
+const initial-belief = :(-1.609438, -1.609438, -1.609438, -1.609438, -1.609438).
+const damping = 0.1.
+const bound = 0.0001.
+//const bound = str2float(@arg2).
+const maxnodes = 20.
+
+// setups initial node belief and some other things
+start(A) -o belief(A, initial-belief),
+            {B | !edge(A, B) | neighbor-belief(A, B, initial-message),
+                               sent-neighbor-belief(A, B, initial-message)}.
+
+// start the tree process
+start-tree(T, []).
+
+// TREE BUILDING RULES
+
+// this rule is run for the root of the tree
+start-tree(T, []),
+A = @host,
+priority(A) > 0.0
+   -o expand-tree(T, [A], []).
+start-tree(T, [Ignore]),
+A = @host,
+priority(A) > 0.0,
+Ignore <> A
+   -o expand-tree(T, [A], []).
+start-tree(T, [Ignore]),
+A = @host,
+priority(A) <= 0.0,
+Ignore <> A
+   -o 1.
+
+// We append into Next all neighbors not yet in the tree
+// or not yet schedule to be visited.
+expand-tree(T, [A | All], Next),
+A = @host
+   -o [collect => L | !edge(A, L),
+         ~ L in All, ~ L in Next,
+         priority(L) > 0.0, cpu-id(L) = cpu-id(A) | new-tree(T, [A | All],
+               if llength(All) + 1 = maxnodes then [] else Next ++ L end)].
+
+// after the tree has been expanded,
+// we decide to either stop and start the first phase
+// or keep expanding.
+new-tree(T, [A | All], [])
+   -o schedule-next(A), first-phase(T, lreverse([A | All]), [A | All]).
+new-tree(T, All, [B | Next])
+   -o schedule-next(B), expand-tree(T, [B | All], Next).
+
+// RULES FOR FIRST PHASE
+
+// when the tree has a single node, we run update immediately on the node
+first-phase(T, [A], [A]),
+A = @host
+   -o update(A), start-tree(T, [A]).
+// the first phase is done, update A and run the second phase on B.
+first-phase(T, [A, B | Next], [A]), A = @host
+   -o update(A), schedule-next(B), second-phase(T, [B | Next]).
+// if we have nodes to process, we run update and schedule the next node to update on the tree.
+first-phase(T, All, [A, B | Next]), A = @host
+   -o update(A), schedule-next(B), first-phase(T, All, [B | Next]).
+
+// RULES FOR SECOND PHASE
+
+// in this rule, we are running the second phase on the last node (last node in the tree).
+// we add A to the ignore list since we do not want to start the tree here again!
+second-phase(T, [A]), A = @host
+   -o update(A), start-tree(T, [A]).
+// running second phase but not done yet
+second-phase(T, [A, B | Next]), A = @host
+   -o update(A), schedule-next(B), second-phase(T, [B | Next]).
+
+// NORMAL CODE STARTS HERE
+
+start(A).
+
+// new neighbor beliefs
+neighbor-belief(A, B, Belief),
+new-neighbor-belief(A, B, NewBelief)
+   -o neighbor-belief(A, B, NewBelief).
+
+// update belief to be sent to one neighbor
+update-messages(A, NewBelief),
+!edge(A, B),
+neighbor-belief-old(A, B, OldIn),
+sent-neighbor-belief(A, B, OldOut),
+Cavity = normalizestruct(dividestruct(NewBelief, OldIn)),
+Convolved = normalizestruct(convolvestruct(global-potential, Cavity)),
+OutMessage = dampstruct(Convolved, OldOut, damping)
+   -o Residual = residualstruct(OutMessage, OldOut),
+      (if Residual > bound then set-priority(B, Residual), update(B) otherwise 1 end),
+      new-neighbor-belief(B, A, OutMessage),
+      update-messages(A, NewBelief),
+      sent-neighbor-belief(A, B, OutMessage).
+
+// all beliefs were sent!
+update-messages(A, NewBelief) -o 1.
+
+// if we have two update functions, just run one of them
+update(A), update(A) -o update(A).
+
+// make a copy of neighbors beliefs in order to add them up
+update(A),
+!potential(A, Potential),
+belief(A, MyBelief)
+   -o [custom addfloatstructs Potential => Belief | B, Belief, Normalized | neighbor-belief(A, B, Belief) |
+            neighbor-belief-old(A, B, Belief), neighbor-belief(A, B, Belief) |
+            Normalized = normalizestruct(Belief), update-messages(A, Normalized), belief(A, Normalized)].
+

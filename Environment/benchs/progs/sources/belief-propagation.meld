@@ -1,0 +1,69 @@
+
+type :(float, float, float, float, float) bvector.
+
+type route edge(node, node).
+type potential(node, bvector).
+
+type linear belief(node, bvector).
+type linear new-neighbor-belief(node, node, bvector). // neighbor sent an update
+type linear sent-neighbor-belief(node, node, bvector). // what we sent previously
+type linear neighbor-belief(node, node, bvector). // current neighbor belief
+type linear neighbor-belief-old(node, node, bvector).
+
+type linear start(node).
+type linear update(node).
+type linear update-messages(node, bvector).
+
+priority @no_initial_priorities.
+priority @cluster @static.
+compact edge.
+compact potential.
+
+const global-potential =  :(-0.0, -2.0, -4.0, -6.0, -8.0, -2.0, -0.0, -2.0, -4.0, -6.0, -4.0, -2.0, -0.0, -2.0, -4.0, -6.0, -4.0, -2.0, -0.0, -2.0, -8.0, -6.0, -4.0, -2.0, -0.0).
+const initial-message = :(-1.60944, -1.60944, -1.60944, -1.60944, -1.60944).
+const initial-belief = :(-1.609438, -1.609438, -1.609438, -1.609438, -1.609438).
+const damping = 0.1.
+const bound = 0.0001.
+//const bound = str2float(@arg1).
+
+start(A).
+
+// setups initial node belief and some other things
+start(A) -o belief(A, initial-belief),
+            {B | !edge(A, B) | neighbor-belief(A, B, initial-message),
+                               sent-neighbor-belief(A, B, initial-message)},
+            update(A).
+
+// new neighbor beliefs
+neighbor-belief(A, B, Belief),
+new-neighbor-belief(A, B, NewBelief)
+   -o neighbor-belief(A, B, NewBelief).
+
+// update belief to be sent to one neighbor
+update-messages(A, NewBelief),
+!edge(A, B),
+neighbor-belief-old(A, B, OldIn),
+sent-neighbor-belief(A, B, OldOut),
+Cavity = normalizestruct(dividestruct(NewBelief, OldIn)),
+Convolved = normalizestruct(convolvestruct(global-potential, Cavity)),
+OutMessage = dampstruct(Convolved, OldOut, damping)
+   -o Residual = residualstruct(OutMessage, OldOut),
+      (if Residual > bound then update(B) otherwise 1 end),
+      update-messages(A, NewBelief),
+      new-neighbor-belief(B, A, OutMessage),
+      sent-neighbor-belief(A, B, OutMessage).
+
+// all beliefs were sent!
+update-messages(A, NewBelief) -o 1.
+
+// if we have two update functions, just run one of them
+update(A), update(A) -o update(A).
+
+// make a copy of neighbors beliefs in order to add them up
+update(A),
+!potential(A, Potential),
+belief(A, MyBelief)
+   -o [custom addfloatstructs Potential => Belief | B, Belief, Normalized | neighbor-belief(A, B, Belief) |
+            neighbor-belief-old(A, B, Belief), neighbor-belief(A, B, Belief) |
+            Normalized = normalizestruct(Belief), update-messages(A, Normalized), belief(A, Normalized)].
+

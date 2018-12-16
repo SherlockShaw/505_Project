@@ -1,0 +1,3 @@
+include #shortest-path-base.meld
+
+path(A, A, 0, 0).

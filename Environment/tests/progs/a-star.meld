@@ -1,0 +1,34 @@
+
+include #data/grid5.meld
+
+type route edge(node, node, int).
+type coord(node, int, int).
+type linear new-distance(node, int, list node).
+type linear distance(node, int, list node).
+
+compact edge. compact coord.
+
+priority @order @asc.
+priority @initial 9999.
+
+const endx = 4.
+const endy = 4.
+const inf = 99999.
+
+fun abs(int X) : int = if X >= 0 then X else 0 - X end.
+
+new-distance(@0, 0, [@0]).
+distance(A, inf, []).
+
+new-distance(A, T, P),
+distance(A, inf, []),
+!coord(A, endx, endy)
+   -o stop-program(A), distance(A, T, P).
+
+distance(A, D1, P1), new-distance(A, D2, P2), D2 < D1,
+!coord(A, X, Y)
+   -o {B, W | !edge(A, B, W) | new-distance(B, D2 + W, [B | P2]), set-priority(B, float(abs(endx - X)) + float(abs(endy - Y)))},
+      distance(A, D2, P2).
+
+distance(A, D1, P1), new-distance(A, D2, P2), D2 >= D1
+   -o distance(A, D1, P1).
