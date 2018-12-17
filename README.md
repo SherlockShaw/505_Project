@@ -3,7 +3,7 @@ My project is based on a new logic programming language call linear meld (LM).
 
 This resporitory includes the following content:
 1. The compiling and executing environment for LM programs;
-2. Some practical problems I solved using LM programming such as graph coloring, pagerank, etc.
+2. Some practical problems I solved using LM programming such as shortest distance, pagerank, etc.
 
 How to compile LM programs:
 Go to Environment/meld/benches
