@@ -1,0 +1,47 @@
+type left(node, node).
+type right(node, node).
+type down-right(node, node).
+type down-left(node, node).
+type coord(node, int, int).
+type linear propagate-left(node, list int).
+type linear propagate-right(node, list int).
+type linear test-and-send-down(node, list int).
+type linear send-down(node, list int).
+type linear final-state(node, list int).
+
+//allocator "basic".
+
+priority @cluster @static.
+compact left.
+compact right.
+compact coord.
+compact down-right.
+compact down-left.
+
+propagate-right(@0, []).
+
+propagate-left(A, Coords)
+   -o {L | !left(A, L), L <> A | propagate-left(L, Coords)},
+      test-and-send-down(A, Coords).
+
+propagate-right(A, Coords)
+   -o {R | !right(A, R), R <> A | propagate-right(R, Coords)},
+      test-and-send-down(A, Coords).
+
+test-and-send-down(A, Coords),
+!coord(A, X, Y),
+~ queens_violation(Y, Coords)
+   -o send-down(A, [Y | Coords]).
+
+test-and-send-down(A, Coords),
+!coord(A, X, Y)
+   -o 1.
+
+send-down(A, Coords),
+!coord(A, size - 1, _)
+   -o final-state(A, Coords).
+
+send-down(A, Coords)
+   -o {B | !down-right(A, B), B <> A | propagate-right(B, Coords)},
+      {B | !down-left(A, B), B <> A | propagate-left(B, Coords)}.
+
